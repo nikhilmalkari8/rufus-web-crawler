@@ -4,21 +4,17 @@ import sys
 from rufus.client import RufusClient
 
 async def main():
-    # Hardcoded values
     url = "https://www.dennys.com"
     instructions = "get the details of burgers"
     
-    # Initialize client
     client = RufusClient()
     
-    # The score thresholds
     min_score_threshold = 60
     stop_score_threshold = 100
     
     print(f"Starting scraping of {url} with instructions: {instructions}")
     print(f"Will collect pages with score >= {min_score_threshold} and stop at {stop_score_threshold}")
-    
-    # Modified scraping logic to handle score-based criteria
+
     collected_pages = await client.scrape_with_score_criteria(
         url=url, 
         instructions=instructions, 
@@ -33,25 +29,21 @@ async def main():
     
     print(f"Collected {len(collected_pages)} pages with scores between {min_score_threshold} and {stop_score_threshold}+")
     
-    # Process all collected pages with AI
     processed_results = []
     for page in collected_pages:
         print(f"Processing page: {page['url']} (score: {page['relevance_score']})")
-        
-        # Create a focused prompt
+
         focused_prompt = f"Based on the following content from {page['url']}, {instructions}"
         
         processed = await client.ai_processor.process_content(page, focused_prompt)
         processed['source_url'] = page['url']
         processed['relevance_score'] = page['relevance_score']
         processed_results.append(processed)
-    
-    # Combine all results into a comprehensive answer
+
     final_result = {}
     if processed_results:
         print("Generating final AI summary from all collected pages...")
-        
-        # Create a combined content from all processed pages
+
         combined_data = {
             "content": "\n\n".join([
                 f"--- From {result['source_url']} (Score: {result['relevance_score']}) ---\n{result['summary']}"
@@ -63,8 +55,7 @@ async def main():
             combined_data,
             f"Based on the following information from multiple pages about {instructions}, provide a comprehensive summary:"
         )
-    
-    # **Structured JSON Output**
+
     structured_output = {
         "query": instructions,
         "source_url": url,
@@ -80,15 +71,13 @@ async def main():
             } for result in processed_results
         ]
     }
-    
-    # Save output to JSON file
+
     output_file = "scraping_results.json"
     with open(output_file, "w", encoding="utf-8") as json_file:
         json.dump(structured_output, json_file, indent=4, ensure_ascii=False)
     
     print(f"\nResults saved to '{output_file}'.")
-    
-    # Print structured JSON output for reference
+
     print(json.dumps(structured_output, indent=4, ensure_ascii=False))
 
 if __name__ == "__main__":

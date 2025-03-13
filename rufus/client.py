@@ -7,9 +7,8 @@ from typing import List, Dict, Optional
 from playwright.async_api import async_playwright
 from .ai_processor import AIContentProcessor
 from .scraper import WebScraper
-from .ai_processor import AIKeywordExtractor  # Add this import
+from .ai_processor import AIKeywordExtractor  
 
-# Set up logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -52,24 +51,21 @@ class RufusClient:
         Returns:
             List of collected pages with scores >= min_score
         """
-        # Extract keywords using AI-powered method
         keywords = await self.keyword_extractor.extract_keywords(instructions)
         logger.info(f"Extracted keywords: {keywords}")
-        
-        # Initialize scraper with keywords
+
         self.scraper = WebScraper(keywords)
         
         try:
             async with async_playwright() as p:
                 browser = await p.chromium.launch(
-                    headless=True,  # Run in headless mode
+                    headless=True, 
                 )
                 context = await browser.new_context(
                     viewport={"width": 1280, "height": 800},
                     user_agent="Rufus Web Scraper 1.0"
                 )
-                
-                # Get pages with cumulative score criteria
+
                 collected_pages = await self.scraper.crawl_with_score_criteria(
                     context=context,
                     start_url=url,
@@ -107,8 +103,7 @@ class RufusClient:
             Comprehensive analysis results with summary and details
         """
         logger.info(f"Starting analysis of {url} with instructions: {instructions}")
-        
-        # Collect pages matching criteria
+
         collected_pages = await self.scrape_with_cumulative_score(
             url=url,
             instructions=instructions,
@@ -129,13 +124,11 @@ class RufusClient:
             }
             
         logger.info(f"Processing {len(collected_pages)} pages with AI analysis...")
-        
-        # Process all collected pages with AI
+
         processed_results = []
         for page in collected_pages:
             logger.info(f"Processing page: {page['url']} (score: {page['relevance_score']})")
-            
-            # Create a focused prompt for this page
+
             focused_prompt = f"Based on the following content from {page['url']}, provide a detailed summary about {instructions}"
             
             processed = await self.ai_processor.process_content(page, focused_prompt)
@@ -143,27 +136,23 @@ class RufusClient:
             processed['title'] = page.get('title', 'Untitled')
             processed['relevance_score'] = page['relevance_score']
             processed_results.append(processed)
-        
-        # Generate final comprehensive result
+
         final_result = {}
         if processed_results:
             logger.info("Generating final AI summary from all collected pages...")
-            
-            # Create combined content from all processed pages
+
             combined_data = {
                 "content": "\n\n".join([
                     f"--- From {result['title']} ({result['source_url']}) (Score: {result['relevance_score']}) ---\n{result['summary']}"
                     for result in processed_results
                 ])
             }
-            
-            # Generate comprehensive summary
+
             final_result = await self.ai_processor.process_content(
                 combined_data,
                 f"Based on the following information from multiple pages about {instructions}, provide a comprehensive analysis and summary:"
             )
-        
-        # Structure the output
+
         structured_output = {
             "query": instructions,
             "source_url": url,
@@ -184,7 +173,6 @@ class RufusClient:
         logger.info("Analysis completed successfully")
         return structured_output
 
-# Move these functions outside the class, making them separate functions in the module
 async def run_rufus(url, query, api_key=None):
     """Run Rufus analysis and return results"""
     client = RufusClient(api_key)
@@ -199,17 +187,14 @@ def cli_main():
         
     url = sys.argv[1]
     query = sys.argv[2]
-    
-    # Check for API key in environment
+
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         print("Warning: No OpenAI API key found. Set the OPENAI_API_KEY environment variable.")
         print("Some features may be limited.")
-    
-    # Run the analysis
+
     results = asyncio.run(run_rufus(url, query, api_key))
     
-    # Print results
     print(json.dumps(results, indent=2))
 
 if __name__ == "__main__":

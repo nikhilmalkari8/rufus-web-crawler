@@ -4,7 +4,6 @@ from playwright.async_api import BrowserContext, Page
 from urllib.parse import urlparse
 import re
 
-# Set up logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -16,8 +15,8 @@ class WebScraper:
     
     def __init__(self, keywords: List[str]):
         self.keywords = keywords
-        self.base_domain = ""  # Will be set during crawl
-        self.base_url = ""     # Complete base URL
+        self.base_domain = ""  
+        self.base_url = ""     
 
     async def crawl_with_score_criteria(self, context: BrowserContext, start_url: str, 
                                     max_depth: int = 2, min_score: int = 100,
@@ -27,14 +26,12 @@ class WebScraper:
         - Collects pages with score >= min_score
         - Stops when the cumulative score of collected pages reaches cumulative_score_threshold
         """
-        # Extract base domain and URL for relative link handling
         parsed_url = urlparse(start_url)
         
         if parsed_url.netloc:
             self.base_domain = parsed_url.netloc
             self.base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
         else:
-            # Handle case where URL might be malformed
             if '://' in start_url:
                 self.base_domain = start_url.split('://', 1)[1].split('/', 1)[0]
                 self.base_url = start_url.split('/', 3)[0] + '//' + self.base_domain
@@ -60,8 +57,7 @@ class WebScraper:
                 
             if depth > max_depth:
                 continue
-                
-            # Normalize and validate URL
+
             normalized_url = self._normalize_url(current_url)
             if not normalized_url:
                 logger.warning(f"Skipping invalid URL: {current_url}")
@@ -71,15 +67,11 @@ class WebScraper:
             
             try:
                 page = await context.new_page()
-                # Set a longer timeout and handle navigation errors
                 await page.goto(normalized_url, timeout=45000, wait_until="domcontentloaded")
-                
-                # Check if page is accessible and has content
+
                 if await self._is_valid_page(page):
-                    # Extract content
                     content = await self._extract_content(page)
-                    
-                    # Check if content is relevant
+
                     relevance_score = self._check_relevance(content)
                     page_title = await self._get_page_title(page)
                     
@@ -99,16 +91,13 @@ class WebScraper:
                         cumulative_score += relevance_score
                         
                         logger.info(f"Current cumulative score: {cumulative_score}/{cumulative_score_threshold}")
-                        
-                        # Check if we should stop crawling based on cumulative score
+
                         if cumulative_score >= cumulative_score_threshold:
                             logger.info(f"Reached cumulative score threshold of {cumulative_score_threshold}. Stopping crawl.")
                             stop_crawling = True
-                    
-                    # Continue crawling if not at max depth and not stopping
+
                     if depth < max_depth and not stop_crawling:
                         links = await self._extract_links(page)
-                        # Add links to queue with priority for same domain
                         same_domain_links = []
                         external_links = []
                         
@@ -118,8 +107,7 @@ class WebScraper:
                                     same_domain_links.append((link, depth + 1))
                                 else:
                                     external_links.append((link, depth + 1))
-                        
-                        # Add same domain links first, then external links
+
                         queue.extend(same_domain_links)
                         queue.extend(external_links)
             
@@ -129,25 +117,21 @@ class WebScraper:
                 await page.close()
                 
         logger.info(f"Crawl completed. Collected {len(collected_pages)} relevant pages with cumulative score of {cumulative_score}.")
-        
-        # Sort results by relevance score
+
         collected_pages.sort(key=lambda x: x.get('relevance_score', 0), reverse=True)
         return collected_pages
     
     async def _is_valid_page(self, page: Page) -> bool:
         """Check if the page is valid and has content"""
         try:
-            # Check if page has a body
             body = await page.query_selector('body')
             if not body:
                 return False
-                
-            # Check for common error indicators
             status = await page.evaluate("() => document.querySelector('body').innerText")
             error_phrases = ["404", "not found", "access denied", "forbidden", 
                             "error", "unavailable", "sorry"]
             
-            if status and len(status) < 100:  # Short page content often indicates an error
+            if status and len(status) < 100:  
                 status_lower = status.lower()
                 if any(phrase in status_lower for phrase in error_phrases):
                     return False
@@ -167,21 +151,16 @@ class WebScraper:
         """Normalize URL to absolute format"""
         if not url:
             return ""
-            
-        # Handle JavaScript links, anchors, etc.
+
         if url.startswith(('javascript:', 'mailto:', 'tel:', '#')):
             return ""
-            
-        # Handle relative URLs
+
         if not url.startswith(('http://', 'https://')):
             if url.startswith('//'):
-                # Protocol-relative URL
                 return f"https:{url}"
             elif url.startswith('/'):
-                # Absolute path
                 return f"{self.base_url}{url}"
             else:
-                # Relative path
                 return f"{self.base_url}/{url}"
                 
         return url
@@ -189,7 +168,6 @@ class WebScraper:
     async def _extract_content(self, page: Page) -> str:
         """Extract meaningful content from page with improved targeting"""
         try:
-            # Try to identify and ignore navigation, footers, etc.
             await page.evaluate("""
                 () => {
                     // Remove common non-content elements
@@ -199,8 +177,7 @@ class WebScraper:
                     });
                 }
             """)
-            
-            # First try to get main content from common content containers
+
             content_selectors = [
                 'main', 'article', '#content', '.content', '#main-content', '.main-content',
                 '.post', '.entry', '.article', '.page-content', '.entry-content', 
@@ -213,23 +190,21 @@ class WebScraper:
                     texts = []
                     for element in elements:
                         text = await element.inner_text()
-                        if text and len(text) > 100:  # Ignore very short content
+                        if text and len(text) > 100:
                             texts.append(text)
                     if texts:
                         return "\n\n".join(texts)
-            
-            # Extract text from all paragraphs if no content containers found
+
             paragraphs = await page.query_selector_all('p')
             if paragraphs:
                 texts = []
                 for p in paragraphs:
                     text = await p.inner_text()
-                    if text and len(text) > 20:  # Ignore very short paragraphs
+                    if text and len(text) > 20:  
                         texts.append(text)
                 if texts:
                     return "\n\n".join(texts)
-            
-            # Fallback to body if no structured content found
+
             return await page.inner_text('body')
             
         except Exception as e:
@@ -266,39 +241,31 @@ class WebScraper:
             
         content_lower = content.lower()
         base_score = 0
-        
-        # Score each keyword based on frequency and location
+
         for keyword in self.keywords:
             keyword_lower = keyword.lower()
-            
-            # Basic count
+
             count = content_lower.count(keyword_lower)
             base_score += count * 2
-            
-            # Check for exact matches (with word boundaries)
+
             exact_pattern = r'\b' + re.escape(keyword_lower) + r'\b'
             exact_matches = len(re.findall(exact_pattern, content_lower))
             base_score += exact_matches * 3
-            
-            # Check for keyword in first 500 characters (introduction)
+
             intro = content_lower[:500]
             if keyword_lower in intro:
                 base_score += 10
-                
-            # Check for keyword in headers
+
             lines = content.split('\n')
             for line in lines:
                 line_lower = line.lower().strip()
                 if keyword_lower in line_lower and len(line) < 100:
-                    # Likely a header or title if short
                     base_score += 15
-                    
-        # Penalize very short content
+
         content_length = len(content)
         if content_length < 500:
             base_score = int(base_score * 0.7)
-            
-        # Bonus for longer, substantial content
+
         if content_length > 1000:
             base_score = int(base_score * 1.2)
         if content_length > 3000:

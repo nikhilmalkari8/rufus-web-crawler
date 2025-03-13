@@ -10,7 +10,6 @@ async def test_scraper():
         context = await browser.new_context()
         scraper = WebScraper()
         
-        # Example strategy (replace with a more meaningful one)
         strategy = {
             "content_selectors": "body",
             "keywords": ["example"]
