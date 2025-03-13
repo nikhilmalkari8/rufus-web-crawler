@@ -1,0 +1,2 @@
+[console_scripts]
+rufus = rufus.client:cli_main

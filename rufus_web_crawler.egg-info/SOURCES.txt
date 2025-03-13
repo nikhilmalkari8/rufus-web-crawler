@@ -1,0 +1,16 @@
+README.md
+setup.py
+examples/__Init__.py
+examples/example.py
+rufus/__init__.py
+rufus/ai_processor.py
+rufus/client.py
+rufus/scraper.py
+rufus/utils.py
+rufus_web_crawler.egg-info/PKG-INFO
+rufus_web_crawler.egg-info/SOURCES.txt
+rufus_web_crawler.egg-info/dependency_links.txt
+rufus_web_crawler.egg-info/entry_points.txt
+rufus_web_crawler.egg-info/requires.txt
+rufus_web_crawler.egg-info/top_level.txt
+tests/test_scrapper.py
